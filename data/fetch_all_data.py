@@ -3,6 +3,8 @@
 QuantumFlow AI - Ma'lumot Yuklash Skripti
 Bepul manbalardan ma'lumot yuklash
 """
+import argparse
+import json
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -99,28 +101,88 @@ def download_data(symbols_dict, interval='1h', start='2020-01-01', end=None, out
     if end is None:
         end = datetime.now().strftime('%Y-%m-%d')
 
+    interval = interval.lower()
     os.makedirs(output_dir, exist_ok=True)
     results = {}
+
+    use_period = False
+    period = None
+
+    # Yahoo Finance intraday data often supports only the last 730 days.
+    if interval not in ['1d', '1wk', '1mo']:
+        now = datetime.now()
+        requested_start = datetime.fromisoformat(start)
+        requested_end = datetime.fromisoformat(end)
+        max_age = timedelta(days=730)
+
+        if requested_end > now:
+            requested_end = now
+            logger.warning(
+                f"⚠️ {interval} interval uchun end hozirgi sanadan katta bo‘lishi mumkin emas. end={requested_end.strftime('%Y-%m-%d')} bo‘ldi."
+            )
+
+        if requested_end < now - max_age or requested_end - requested_start > max_age:
+            use_period = True
+            period = '730d'
+            logger.warning(
+                "⚠️ 1h ma'lumotlar faqat oxirgi 730 kungacha mavjud. "
+                "Siz so‘ragan tarixiy intervalga mos kelmaydi, shuning uchun oxirgi 730 kun olinadi."
+            )
+            start = (now - max_age).strftime('%Y-%m-%d')
+            end = now.strftime('%Y-%m-%d')
 
     for name, symbol in symbols_dict.items():
         try:
             logger.info(f"📊 {name} ({symbol}) yuklanmoqda...")
 
-            df = yf.download(
-                symbol,
-                start=start,
-                end=end,
-                interval=interval,
-                progress=False
-            )
+            if use_period:
+                df = yf.download(
+                    symbol,
+                    period=period,
+                    interval=interval,
+                    progress=False
+                )
+            else:
+                df = yf.download(
+                    symbol,
+                    start=start,
+                    end=end,
+                    interval=interval,
+                    progress=False
+                )
+
+            if df.empty:
+                logger.warning(f"⚠️ {name}: Ma'lumot yo'q. 730d period bilan qayta uriniladi...")
+                if interval not in ['1d', '1wk', '1mo']:
+                    df = yf.download(
+                        symbol,
+                        period='730d',
+                        interval=interval,
+                        progress=False
+                    )
 
             if df.empty:
                 logger.warning(f"⚠️ {name}: Ma'lumot yo'q")
                 continue
 
-            # Ustun nomlarini tozalash
-            df.columns = ['open', 'high', 'low', 'close', 'adj_close', 'volume']
-            df = df[['open', 'high', 'low', 'close', 'volume']]
+            # Ustun nomlarini normalizatsiya qilish
+            df = df.rename(columns={
+                'Open': 'open',
+                'High': 'high',
+                'Low': 'low',
+                'Close': 'close',
+                'Adj Close': 'adj_close',
+                'Volume': 'volume'
+            })
+            df.columns = [c.lower().replace(' ', '_') for c in df.columns]
+
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            missing_cols = [c for c in required_columns if c not in df.columns]
+            if missing_cols:
+                logger.warning(f"⚠️ {name}: kerakli ustunlar yo'q -> {missing_cols}")
+                continue
+
+            df = df[required_columns]
 
             # Saqlash
             filename = f"{name}_{interval}.csv"
@@ -174,28 +236,127 @@ def download_all_tech(output_dir='data'):
 
 def main():
     """Barcha ma'lumotlarni yuklash"""
+    parser = argparse.ArgumentParser(
+        description="QuantumFlow ma'lumot yuklaydigan interaktiv skript"
+    )
+    parser.add_argument(
+        '--category',
+        choices=['forex', 'gold', 'crypto', 'indices', 'tech', 'all', 'auto'],
+        default=None,
+        help='Yuklanadigan aktivlar toifasi'
+    )
+    parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help='Interaktiv rejimda sorovnoma orqali tanlash'
+    )
+    parser.add_argument(
+        '--interval',
+        default='1h',
+        help='Data intervali (1m, 5m, 15m, 30m, 60m, 1h, 1d, 1wk, 1mo)'
+    )
+    parser.add_argument(
+        '--start',
+        default='2020-01-01',
+        help='Boshlanish sanasi (YYYY-MM-DD)'
+    )
+    parser.add_argument(
+        '--end',
+        default=None,
+        help='Tugash sanasi (YYYY-MM-DD). Default hozirgi sana.'
+    )
+    parser.add_argument(
+        '--output-dir',
+        default='data',
+        help='CSV fayllar saqlanadigan papka'
+    )
+    parser.add_argument(
+        '--auto-output-dir',
+        default=None,
+        help='Auto tanlov uchun alohida saqlash papkasi'
+    )
+    args = parser.parse_args()
+
     logger.info("🚀 QUANTUMFLOW MA'LUMOT YUKLASH")
     logger.info("=" * 60)
 
-    # 1. Forex
-    forex_data = download_all_forex()
+    if args.interactive or args.category is None:
+        print("\n--- QuantumFlow interaktiv ma'lumot yuklash ---")
+        print("1) forex")
+        print("2) gold")
+        print("3) crypto")
+        print("4) indices")
+        print("5) tech")
+        print("6) all")
+        print("7) auto")
+        choice = input("Qaysi toifani yuklamoqchisiz? [1-7] (default 6): ").strip() or '6'
+        mapping = {
+            '1': 'forex',
+            '2': 'gold',
+            '3': 'crypto',
+            '4': 'indices',
+            '5': 'tech',
+            '6': 'all',
+            '7': 'auto'
+        }
+        category = mapping.get(choice, 'all')
 
-    # 2. Gold
-    gold_data = download_all_gold()
+        interval = input("Intervalni tanlang (1h): ").strip() or '1h'
+        start = input("Boshlanish sanasini kiriting (2020-01-01): ").strip() or '2020-01-01'
+        end = input("Tugash sanasini kiriting (hozirgi sana): ").strip() or None
+        output_dir = input("Saqlash papkasini kiriting (data): ").strip() or 'data'
+        auto_output_dir = input("Auto tanlov uchun maxsus papka (bo'sh bo'lsa data): ").strip() or None
+    else:
+        category = args.category
+        interval = args.interval
+        start = args.start
+        end = args.end
+        output_dir = args.output_dir
+        auto_output_dir = args.auto_output_dir
 
-    # 3. Crypto
-    crypto_data = download_all_crypto()
+    total = 0
+    run_info = {
+        'category': category,
+        'interval': interval,
+        'start': start,
+        'end': end or datetime.now().strftime('%Y-%m-%d'),
+        'output_dir': output_dir,
+        'downloaded': []
+    }
 
-    # 4. Indices
-    indices_data = download_all_indices()
+    if category in ['forex', 'all', 'auto']:
+        downloaded = download_data(FOREX_PAIRS, interval=interval, start=start, end=end, output_dir=output_dir)
+        total += len(downloaded)
+        run_info['downloaded'].extend(downloaded.keys())
+    if category in ['gold', 'all', 'auto']:
+        downloaded = download_data(COMMODITIES, interval=interval, start=start, end=end, output_dir=output_dir)
+        total += len(downloaded)
+        run_info['downloaded'].extend(downloaded.keys())
+    if category in ['crypto', 'all', 'auto']:
+        downloaded = download_data(CRYPTO_YAHOO, interval=interval, start=start, end=end, output_dir=output_dir)
+        total += len(downloaded)
+        run_info['downloaded'].extend(downloaded.keys())
+    if category in ['indices', 'all', 'auto']:
+        downloaded = download_data(INDICES, interval=interval, start=start, end=end, output_dir=output_dir)
+        total += len(downloaded)
+        run_info['downloaded'].extend(downloaded.keys())
+    if category in ['tech', 'all', 'auto']:
+        downloaded = download_data(TECH_STOCKS, interval=interval, start=start, end=end, output_dir=output_dir)
+        total += len(downloaded)
+        run_info['downloaded'].extend(downloaded.keys())
 
-    # 5. Tech
-    tech_data = download_all_tech()
+    run_info['total_downloaded'] = total
+    run_info['timestamp'] = datetime.now().isoformat()
 
-    # Jami
-    total = len(forex_data) + len(gold_data) + len(crypto_data) + len(indices_data) + len(tech_data)
+    save_dir = auto_output_dir or output_dir
+    os.makedirs(save_dir, exist_ok=True)
+    auto_path = os.path.join(save_dir, 'auto_fetch_info.json')
+    with open(auto_path, 'w', encoding='utf-8') as f:
+        json.dump(run_info, f, ensure_ascii=False, indent=2)
+
     logger.info("=" * 60)
     logger.info(f"✅ JAMI: {total} ta aktiv yuklandi")
+    logger.info(f"ℹ️ Auto info saqlandi: {auto_path}")
     logger.info("=" * 60)
 
 if __name__ == '__main__':
