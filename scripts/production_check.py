@@ -377,8 +377,7 @@ class ProductionReadinessCheck:
         """Print final audit report"""
         total = self.passed + self.failed + self.warnings
 
-        logger.info("
-" + "=" * 80)
+        logger.info("" + "=" * 80)
         logger.info("📊 PRODUCTION READINESS REPORT")
         logger.info("=" * 80)
         logger.info(f"Total Checks: {total}")
@@ -388,15 +387,13 @@ class ProductionReadinessCheck:
         logger.info(f"Pass Rate: {self.passed}/{total} ({self.passed/total*100:.1f}%)")
 
         if self.failed == 0:
-            logger.info("
-🎉 ALL CRITICAL CHECKS PASSED!")
+            logger.info("🎉 ALL CRITICAL CHECKS PASSED!")
             if self.warnings > 0:
                 logger.info(f"⚠️ Address {self.warnings} warnings before going live")
             logger.info("✅ System is READY for paper trading")
             logger.info("📋 Next: Run 2+ weeks paper trading, then gradual live deployment")
         else:
-            logger.error(f"
-❌ {self.failed} CRITICAL CHECKS FAILED")
+            logger.error(f"❌ {self.failed} CRITICAL CHECKS FAILED")
             logger.error("🚫 System NOT READY for live trading")
             logger.error("📋 Fix failed checks and re-run audit")
 
@@ -404,16 +401,14 @@ class ProductionReadinessCheck:
 
         # List failed checks
         if self.failed > 0:
-            logger.info("
-❌ FAILED CHECKS:")
+            logger.info("❌ FAILED CHECKS:")
             for check in self.checks:
                 if check['status'] == 'FAIL':
                     logger.error(f"   • {check['name']}: {check['message']}")
 
         # List warnings
         if self.warnings > 0:
-            logger.info("
-⚠️ WARNINGS:")
+            logger.info("⚠️ WARNINGS:")
             for check in self.checks:
                 if check['status'] == 'WARN':
                     logger.warning(f"   • {check['name']}: {check['message']}")

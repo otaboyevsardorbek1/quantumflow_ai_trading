@@ -165,23 +165,44 @@ def download_data(symbols_dict, interval='1h', start='2020-01-01', end=None, out
                 logger.warning(f"⚠️ {name}: Ma'lumot yo'q")
                 continue
 
-            # Ustun nomlarini normalizatsiya qilish
-            df = df.rename(columns={
-                'Open': 'open',
-                'High': 'high',
-                'Low': 'low',
-                'Close': 'close',
-                'Adj Close': 'adj_close',
-                'Volume': 'volume'
-            })
-            df.columns = [c.lower().replace(' ', '_') for c in df.columns]
+            # ========== TUZATISH: Ustun nomlarini ishonchli normalizatsiya ==========
+            # 1) MultiIndex bo‘lsa, faqat birinchi darajani olamiz
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
 
+            # 2) Barcha ustun nomlarini kichik harfga o‘tkazamiz va bo‘shliqlarni '_' ga almashtiramiz
+            new_cols = []
+            for col in df.columns:
+                if isinstance(col, str):
+                    new_cols.append(col.lower().replace(' ', '_'))
+                else:
+                    # Agar ustun nomi string bo‘lmasa (masalan, tuple bo‘lsa), uni stringga aylantiramiz
+                    new_cols.append(str(col).lower().replace(' ', '_'))
+            df.columns = new_cols
+
+            # 3) Kerakli ustunlarni qayta nomlash (agar mavjud bo‘lsa)
+            rename_map = {
+                'open': 'open',
+                'high': 'high',
+                'low': 'low',
+                'close': 'close',
+                'adj_close': 'adj_close',
+                'volume': 'volume'
+            }
+            # Faqat mavjud ustunlarni rename qilamiz
+            existing = set(df.columns)
+            rename_available = {k: v for k, v in rename_map.items() if k in existing}
+            if rename_available:
+                df = df.rename(columns=rename_available)
+
+            # 4) Kerakli ustunlar mavjudligini tekshiramiz
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             missing_cols = [c for c in required_columns if c not in df.columns]
             if missing_cols:
                 logger.warning(f"⚠️ {name}: kerakli ustunlar yo'q -> {missing_cols}")
                 continue
 
+            # Faqat kerakli ustunlarni saqlaymiz
             df = df[required_columns]
 
             # Saqlash
