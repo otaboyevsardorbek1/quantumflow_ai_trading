@@ -13,6 +13,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from dataclasses import asdict
 from config.config import get_default_config
 from features.engineering import AdvancedFeatureEngineer
 from env.trading_env import QuantumTradingEnv

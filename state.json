@@ -1,0 +1,11 @@
+{
+  "setup_done": true,
+  "config_created": true,
+  "env_created": true,
+  "data_fetched": true,
+  "model_trained": false,
+  "validation_passed": false,
+  "paper_trade_started": false,
+  "last_step": "model_trained",
+  "error": "Training failed"
+}

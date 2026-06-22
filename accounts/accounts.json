@@ -1,10 +1,10 @@
 {
   "demo_account_1": {
-    "account_id": 12345678,
-    "password": "your_demo_password",
-    "server": "DemoServer",
+    "account_id": 500359465, 
+    "password": "kepTtj1}",
+    "server": "ForexClub-MT5 Demo Server",
     "account_type": "demo",
-    "broker_name": "MetaQuotes-Demo",
+    "broker_name": "ForexClub-MT5 Demo Server",
     "max_risk_per_trade": 0.01,
     "max_daily_risk": 0.03,
     "max_total_risk": 0.10,

@@ -1,0 +1,17 @@
+{
+  "mode": "paper",
+  "primary_asset": "XAUUSD",
+  "active_accounts": [
+    "demo"
+  ],
+  "model_path": "checkpoints/best_model.pt",
+  "use_ensemble": true,
+  "device": "auto",
+  "check_interval": 60,
+  "risk_per_trade": 0.01,
+  "daily_risk_limit": 0.03,
+  "max_drawdown": 0.1,
+  "close_on_shutdown": true,
+  "telegram_token": null,
+  "telegram_chat": null
+}
