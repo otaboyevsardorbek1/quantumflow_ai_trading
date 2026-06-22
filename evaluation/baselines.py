@@ -177,8 +177,7 @@ class BaselineComparison:
 
     def print_summary(self):
         """Print comparison summary"""
-        logger.info("
-" + "=" * 80)
+        logger.info("" + "=" * 80)
         logger.info("📊 BASELINE COMPARISON SUMMARY")
         logger.info("=" * 80)
         logger.info(f"{'Strategy':<30} {'Return':>10} {'Sharpe':>8} {'Max DD':>8} {'Trades':>8}")

@@ -3,6 +3,7 @@ QuantumFlow AI Trading System v2.0 - Advanced PPO Trainer
 Curriculum learning, online adaptation, and distributed training support
 """
 import torch
+from torch.compiler import F
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset

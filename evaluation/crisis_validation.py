@@ -95,8 +95,7 @@ class CrisisValidator:
         logger.info("=" * 60)
 
         for crisis_name, period in self.CRISIS_PERIODS.items():
-            logger.info(f"
-📊 Testing: {period['description']}")
+            logger.info(f"📊 Testing: {period['description']}")
             logger.info(f"   Period: {period['start']} to {period['end']}")
             logger.info(f"   Severity: {period['severity']}")
 
@@ -193,8 +192,7 @@ class CrisisValidator:
         passed = result['passed']
         emoji = "✅" if passed else "❌"
 
-        logger.info(f"
-   {emoji} Result: {'PASSED' if passed else 'FAILED'}")
+        logger.info(f"{emoji} Result: {'PASSED' if passed else 'FAILED'}")
         logger.info(f"      Final Equity: {result['final_equity']:.4f} ({result['return_pct']:+.2f}%)")
         logger.info(f"      Max Drawdown: {result['max_drawdown']:.2%}")
         logger.info(f"      Sharpe Ratio: {result['sharpe_ratio']:.2f}")
@@ -216,8 +214,7 @@ class CrisisValidator:
 
         rate = passed / total
 
-        logger.info("
-" + "=" * 60)
+        logger.info("" + "=" * 60)
         logger.info("📊 OVERALL CRISIS VALIDATION SUMMARY")
         logger.info("=" * 60)
         logger.info(f"Tests Run: {total}")
@@ -225,14 +222,10 @@ class CrisisValidator:
         logger.info(f"Pass Rate: {rate:.1%}")
 
         if rate == 1.0:
-            logger.info("
-🎉 PERFECT SCORE!")
+            logger.info("🎉 PERFECT SCORE!")
         elif rate >= 0.75:
-            logger.info("
-✅ GOOD - Agent is reasonably robust")
+            logger.info("✅ GOOD - Agent is reasonably robust")
         elif rate >= 0.50:
-            logger.warning("
-⚠️ MARGINAL - Needs improvement")
+            logger.warning("⚠️ MARGINAL - Needs improvement")
         else:
-            logger.error("
-❌ POOR - Not ready for live trading")
+            logger.error("❌ POOR - Not ready for live trading")
