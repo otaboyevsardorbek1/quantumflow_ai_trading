@@ -40,6 +40,7 @@ def main():
     config['model_path'] = args.model
     config['paper_trading'] = args.paper
     config['check_interval'] = args.interval
+    config['use_ensemble'] = False   # <-- SHU QATORNI QO‘SHING
 
     engine = LiveTradingEngine(config)
     engine.initialize()

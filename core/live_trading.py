@@ -96,27 +96,76 @@ class LiveTradingEngine:
     def _load_agent(self):
         """Load trained agent"""
         model_path = self.config.get('model_path', 'checkpoints/best_model.pt')
+        
+        # Avval checkpoint dan model parametrlarini o‘qib olamiz
+        import torch
+        checkpoint = torch.load(model_path, map_location='cpu')
+        
+        # checkpoint dan qanday kalitlar borligini tekshiramiz
+        if 'config' in checkpoint:
+            model_config = checkpoint['config']
+            n_features = model_config.get('n_features', 256)
+            d_model = model_config.get('d_model', 256)
+            nhead = model_config.get('nhead', 8)
+            num_encoder_layers = model_config.get('num_encoder_layers', 4)
+            dim_feedforward = model_config.get('dim_feedforward', 1024)
+            dropout = model_config.get('dropout', 0.1)
+            window_size = model_config.get('window_size', 128)
+        else:
+            # Agar config bo'lmasa, checkpoint dan shape'larni chiqarib olishga harakat qilamiz
+            # input_embedding.weight shape dan n_features va d_model ni aniqlaymiz
+            state_dict = checkpoint['policy_state_dict']
+            # input_embedding.weight shape: (d_model, n_features)
+            d_model = state_dict['input_embedding.weight'].shape[0]
+            n_features = state_dict['input_embedding.weight'].shape[1]
+            # pos_encoder.pe shape: (max_len, 1, d_model) yoki (max_len, d_model)
+            # max_len dan window_size ni aniqlaymiz
+            pe_shape = state_dict['pos_encoder.pe'].shape
+            if len(pe_shape) == 3:
+                window_size = pe_shape[0]
+            else:
+                window_size = pe_shape[0]  # taxminan
+            # transformer_encoder.layers.0.self_attn.in_proj_weight shape: (3*d_model, d_model)
+            in_proj = state_dict['transformer_encoder.layers.0.self_attn.in_proj_weight']
+            # 3*d_model = in_proj.shape[0]
+            d_model_attn = in_proj.shape[0] // 3
+            # nhead ni aniqlash qiyin, lekin default 8 deb qoldiramiz
+            nhead = 8
+            num_encoder_layers = sum(1 for k in state_dict if k.startswith('transformer_encoder.layers.')) // 6
+            # dim_feedforward ni linear1.weight dan
+            linear1 = state_dict['transformer_encoder.layers.0.linear1.weight']
+            dim_feedforward = linear1.shape[0]
+            dropout = 0.1  # default
 
         # Determine architecture
-        if self.config.get('use_ensemble', True):
+        if self.config.get('use_ensemble', False):
             self.agent = EnsemblePolicy(
-                n_features=self.config.get('n_features', 256),
-                window_size=self.config.get('window_size', 128),
+                n_features=n_features,
+                window_size=window_size,
                 ensemble_size=self.config.get('ensemble_size', 3),
+                d_model=d_model,
+                nhead=nhead,
+                num_encoder_layers=num_encoder_layers,
+                dim_feedforward=dim_feedforward,
+                dropout=dropout,
             )
         else:
             self.agent = TransformerPolicyNetwork(
-                n_features=self.config.get('n_features', 256),
-                window_size=self.config.get('window_size', 128),
+                n_features=n_features,
+                window_size=window_size,
+                d_model=d_model,
+                nhead=nhead,
+                num_encoder_layers=num_encoder_layers,
+                dim_feedforward=dim_feedforward,
+                dropout=dropout,
             )
 
-        # Load weights
-        import torch
-        checkpoint = torch.load(model_path, map_location='cpu')
+        # Load state dict
         self.agent.load_state_dict(checkpoint['policy_state_dict'])
         self.agent.eval()
 
         logger.info(f"🧠 Agent loaded from {model_path}")
+        logger.info(f"   n_features: {n_features}, d_model: {d_model}, layers: {num_encoder_layers}")
 
     def start(self):
         """Start trading loop"""
