@@ -9,11 +9,9 @@ import logging
 import torch
 import numpy as np
 from pathlib import Path
-
+from dataclasses import asdict
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from dataclasses import asdict
 from config.config import get_default_config
 from features.engineering import AdvancedFeatureEngineer
 from env.trading_env import QuantumTradingEnv
@@ -63,46 +61,52 @@ def main():
 
     logger.info(f"🖥️ Device: {device}")
 
-    # Load data
+
     logger.info("📊 Loading data...")
     # This would load actual data
     # For now, create dummy data
-    n_samples = 100000
-    n_features = 256
+    n_samples = 20000
+    n_features = 256   # <--- BU QATORNI QO‘SHING
     features = np.random.randn(n_samples, n_features).astype(np.float32)
     returns = np.random.randn(n_samples).astype(np.float32) * 0.001
     timestamps = np.arange(n_samples)
-
+    n_features = features.shape[1]   # bu qolishi mumkin (agar haqiqiy ma'lumotlarda o'zgarib qolsa)
     logger.info(f"✅ Data loaded: {features.shape}")
 
     # Create environment
     logger.info("🎮 Creating environment...")
+    
     env = QuantumTradingEnv(
-        features=features,
-        returns=returns,
-        timestamps=timestamps,
-        config=config['risk'],
-        window=128,
-        symbol=args.symbol,
-    )
-
+    features=features,
+    returns=returns,
+    timestamps=timestamps,
+    config=asdict(config['risk']),   # RiskConfig ni dict ga o‘tkazamiz
+    window=128,
+    symbol=args.symbol,)
     # Create agent
     logger.info("🤖 Creating agent...")
+    n_features = env.features.shape[1]   # <-- haqiqiy feature sonini olamiz
     if args.ensemble:
-        agent = EnsemblePolicy(
-            n_features=n_features,
-            window_size=128,
-            ensemble_size=3,
-            d_model=256,
+        agent = TransformerPolicyNetwork(
+        n_features=n_features,
+        window_size=64,          # 128 o‘rniga
+        d_model=128,             # 256 o‘rniga
+        nhead=4,                 # 8 o‘rniga
+        num_encoder_layers=2,    # 4 o‘rniga
+        dim_feedforward=512,     # 1024 o‘rniga
+        dropout=0.1,
+        ensemble_size=3,         # 5 o‘rniga
         )
-        logger.info("   Using Ensemble Policy (3 agents)")
     else:
         agent = TransformerPolicyNetwork(
-            n_features=n_features,
-            window_size=128,
-            d_model=256,
-        )
-        logger.info("   Using Transformer Policy")
+        n_features=n_features,
+        window_size=64,          # 128 o‘rniga
+        d_model=128,             # 256 o‘rniga
+        nhead=4,                 # 8 o‘rniga
+        num_encoder_layers=2,    # 4 o‘rniga
+        dim_feedforward=512,     # 1024 o‘rniga
+    )
+    logger.info("   Using Transformer Policy")
 
     # Resume from checkpoint
     if args.resume:
@@ -113,11 +117,10 @@ def main():
     # Create trainer
     logger.info("🏋️ Creating trainer...")
     trainer = PPOTrainer(
-        policy=agent,
-        env=env,
-        config=config['rl'],
-        device=device,
-    )
+    policy=agent,
+    env=env,
+    config=asdict(config['rl']),   # RLConfig ni dict ga o‘tkazamiz
+    device=device,)
 
     if args.eval_only:
         logger.info("📊 Running evaluation...")
@@ -135,7 +138,7 @@ def main():
 
     # Final evaluation
     logger.info("📊 Final evaluation...")
-    final_metrics = trainer.evaluate(n_episodes=20)
+    final_metrics = trainer.evaluate(n_episodes=5)
 
     logger.info("=" * 80)
     logger.info("✅ TRAINING COMPLETE")

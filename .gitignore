@@ -434,3 +434,14 @@ bh_unicode_properties.cache
 GitHub.sublime-settings
 
 # End of https://www.toptal.com/developers/gitignore/api/python,django,sublimetext,node
+
+# Ma'lumot fayllari (CSV, JSON, cache)
+data/*.csv
+data/*.json
+data/__pycache__/
+data/*.log
+
+# Python cache fayllari
+__pycache__/
+*.pyc
+*.pyo

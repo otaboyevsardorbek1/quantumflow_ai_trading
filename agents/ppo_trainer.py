@@ -3,7 +3,7 @@ QuantumFlow AI Trading System v2.0 - Advanced PPO Trainer
 Curriculum learning, online adaptation, and distributed training support
 """
 import torch
-from torch.compiler import F
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
@@ -51,7 +51,7 @@ class PPOTrainer:
         self.ent_coef = config.get('ent_coef', 0.01)
         self.vf_coef = config.get('vf_coef', 0.5)
         self.max_grad_norm = config.get('max_grad_norm', 0.5)
-        self.n_epochs = config.get('n_epochs', 10)
+        self.n_epochs = config.get('n_epochs', 5)
         self.batch_size = config.get('batch_size', 64)
         self.n_steps = config.get('n_steps', 2048)
 
@@ -87,12 +87,6 @@ class PPOTrainer:
         self.best_reward = -np.inf
 
     def collect_rollouts(self) -> Dict:
-        """
-        Rollout collection with GAE
-
-        Returns:
-            rollout_data: dict with observations, actions, rewards, etc.
-        """
         observations = []
         actions = []
         rewards = []
@@ -100,8 +94,12 @@ class PPOTrainer:
         log_probs = []
         dones = []
 
+        n_features = self.env.features.shape[1]  # <--- qo'shildi
+
         obs, _ = self.env.reset()
-        obs = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
+        obs_np = obs
+        feature_obs = obs_np[:self.env.window * n_features].reshape(self.env.window, n_features)
+        obs = torch.FloatTensor(feature_obs).unsqueeze(0).to(self.device)
 
         episode_reward = 0
         episode_length = 0
@@ -111,20 +109,18 @@ class PPOTrainer:
                 if isinstance(self.policy, EnsemblePolicy):
                     action, value, _ = self.policy.get_action(obs, deterministic=False)
                     action = torch.FloatTensor(action).to(self.device)
+                    log_prob = torch.zeros(action.shape[0], device=self.device)
                 else:
                     action_mean, value, _ = self.policy(obs)
                     log_std = self.policy.actor_log_std.expand_as(action_mean)
                     std = torch.exp(log_std)
                     action = action_mean + std * torch.randn_like(action_mean)
-
-                    # Log probability
-                    log_prob = -0.5 * (((action - action_mean) / (std + 1e-8)) ** 2 + 
-                                       2 * self.policy.actor_log_std + np.log(2 * np.pi))
+                    log_prob = -0.5 * (((action - action_mean) / (std + 1e-8)) ** 2 +
+                                    2 * self.policy.actor_log_std + np.log(2 * np.pi))
                     log_prob = log_prob.sum(dim=-1)
 
                 value = value.squeeze(-1)
 
-            # Step environment
             action_np = action.cpu().numpy()[0]
             next_obs, reward, terminated, truncated, info = self.env.step(action_np)
             done = terminated or truncated
@@ -133,7 +129,7 @@ class PPOTrainer:
             actions.append(action_np)
             rewards.append(reward)
             values.append(value.cpu().numpy()[0])
-            log_probs.append(log_prob.cpu().numpy()[0] if 'log_prob' in locals() else 0)
+            log_probs.append(log_prob.cpu().numpy()[0])
             dones.append(done)
 
             episode_reward += reward
@@ -145,15 +141,16 @@ class PPOTrainer:
                 episode_reward = 0
                 episode_length = 0
                 obs, _ = self.env.reset()
-                obs = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
+                obs_np = obs
+                feature_obs = obs_np[:self.env.window * n_features].reshape(self.env.window, n_features)
+                obs = torch.FloatTensor(feature_obs).unsqueeze(0).to(self.device)
             else:
-                obs = torch.FloatTensor(next_obs).unsqueeze(0).to(self.device)
+                obs_np = next_obs
+                feature_obs = obs_np[:self.env.window * n_features].reshape(self.env.window, n_features)
+                obs = torch.FloatTensor(feature_obs).unsqueeze(0).to(self.device)
 
-        # Compute advantages using GAE
         advantages = self._compute_gae(rewards, values, dones)
         returns = advantages + np.array(values)
-
-        # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         rollout_data = {
@@ -166,9 +163,7 @@ class PPOTrainer:
             'returns': returns,
             'dones': np.array(dones),
         }
-
         return rollout_data
-
     def _compute_gae(self, rewards: List, values: List, dones: List) -> np.ndarray:
         """Generalized Advantage Estimation"""
         advantages = np.zeros(len(rewards), dtype=np.float32)
@@ -339,16 +334,19 @@ class PPOTrainer:
         logger.info("✅ Training complete!")
 
     def evaluate(self, n_episodes: int = 5) -> Dict:
-        """Model evaluation"""
         rewards = []
+        n_features = self.env.features.shape[1]
 
         for _ in range(n_episodes):
             obs, _ = self.env.reset()
+            obs_np = obs
+            feature_obs = obs_np[:self.env.window * n_features].reshape(self.env.window, n_features)
+            obs_tensor = torch.FloatTensor(feature_obs).unsqueeze(0).to(self.device)
+
             done = False
             episode_reward = 0
 
             while not done:
-                obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)
                 with torch.no_grad():
                     if isinstance(self.policy, EnsemblePolicy):
                         action, _, _ = self.policy.get_action(obs_tensor, deterministic=True)
@@ -361,6 +359,11 @@ class PPOTrainer:
                 episode_reward += reward
                 done = terminated or truncated
 
+                if not done:
+                    obs_np = obs
+                    feature_obs = obs_np[:self.env.window * n_features].reshape(self.env.window, n_features)
+                    obs_tensor = torch.FloatTensor(feature_obs).unsqueeze(0).to(self.device)
+
             rewards.append(episode_reward)
 
         return {
@@ -369,7 +372,6 @@ class PPOTrainer:
             'min_reward': np.min(rewards),
             'max_reward': np.max(rewards),
         }
-
     def _update_curriculum(self, iteration: int, total_iterations: int):
         """Curriculum learning stage update"""
         progress = iteration / total_iterations

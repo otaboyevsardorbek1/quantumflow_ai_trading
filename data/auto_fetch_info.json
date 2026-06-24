@@ -2,7 +2,7 @@
   "category": "auto",
   "interval": "1h",
   "start": "2020-01-01",
-  "end": "2026-06-22",
+  "end": "2026-06-24",
   "output_dir": "data",
   "downloaded": [
     "EURUSD",
@@ -12,8 +12,10 @@
     "USDCAD",
     "USDCHF",
     "NZDUSD",
+    "EURGBP",
     "XAUUSD",
     "XAGUSD",
+    "WTI",
     "BRENT",
     "NATGAS",
     "COPPER",
@@ -40,6 +42,6 @@
     "AMZN",
     "TSLA"
   ],
-  "total_downloaded": 34,
-  "timestamp": "2026-06-22T23:41:16.513544"
+  "total_downloaded": 36,
+  "timestamp": "2026-06-24T00:03:41.174636"
 }

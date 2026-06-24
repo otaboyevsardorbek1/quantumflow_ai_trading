@@ -113,6 +113,11 @@ class AdvancedFeatureEngineer:
 
         self.feature_names = list(features_df.columns)
 
+                # features_scaled ni qaytarishdan oldin
+        if features_scaled.shape[1] < 256:
+            pad = np.zeros((features_scaled.shape[0], 256 - features_scaled.shape[1]), dtype=np.float32)
+            features_scaled = np.hstack([features_scaled, pad])
+
         return features_scaled.astype(np.float32)
 
     def _compute_price_features(self, df: pd.DataFrame) -> Dict:
